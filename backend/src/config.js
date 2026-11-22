@@ -24,8 +24,8 @@ export const config = {
   jdoodleClientId: process.env.JDOODLE_CLIENT_ID,
   jdoodleClientSecret: process.env.JDOODLE_CLIENT_SECRET,
   runTimeoutMs: 15_000,
-  // Stay under JDoodle's free daily quota
-  maxRunsPerDay: 150,
+  // Stay under JDoodle's free daily quota (20 per day on the free plan)
+  maxRunsPerDay: 15,
   // AI assistant (Google Gemini, free tier). The key comes from .env and is never sent to the browser.
   geminiApiKey: process.env.GEMINI_API_KEY,
   assistantModel: process.env.ASSISTANT_MODEL || 'gemini-3.5-flash-lite',
