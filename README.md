@@ -291,7 +291,7 @@ The app still starts without these keys. The assistant and the Run button simply
 ### 1. Clone and install
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/MohdHuzaifa-07/CodeMate.git
 cd CodeMate
 
 cd backend
