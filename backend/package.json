@@ -1,0 +1,25 @@
+{
+  "name": "codemate-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Realtime backend for CodeMate: rooms, presence, whiteboard, code and chat",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "check-assistant": "node scripts/check-assistant.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1",
+    "yjs": "^13.6.33"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}
