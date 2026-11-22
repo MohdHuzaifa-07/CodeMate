@@ -2,7 +2,7 @@
 
 **Draw, code and chat together in real time.**
 
-CodeMate is a real-time collaboration workspace. People join a room with a 6-character code and work together on a shared whiteboard, a shared code editor with live cursors, one-click code execution, a room chat, and a private AI assistant that understands the room's code, chat and last run.
+CodeMate is a real-time collaboration workspace. People join a room with a 6-character code and work together on a shared whiteboard, a shared code editor with live cursors, one-click code execution, a room chat, and a private AI assistant, built with retrieval-augmented generation (RAG), that understands the room's code, chat and last run.
 
 ---
 
@@ -65,6 +65,7 @@ CodeMate is a real-time collaboration workspace. People join a room with a 6-cha
 
 ### AI assistant
 - Powered by Google Gemini (free tier).
+- Uses **Retrieval-Augmented Generation (RAG)**: it searches the room's live code, run output and chat for the parts that matter, then gives only those to the model.
 - Answers questions about the room's code, the last run and the chat, for example "Why did the last run fail?" or "What did we decide about the database?".
 - Answers go **only to the person who asked**.
 - Follow-up questions work (the last 3 turns are remembered).
@@ -83,6 +84,7 @@ CodeMate is a real-time collaboration workspace. People join a room with a 6-cha
 | Backend | Node.js (20 or newer), Express 5, Socket.IO, `cors`, `dotenv` |
 | Code execution | JDoodle Compiler API |
 | AI assistant | Google Gemini API (free tier) |
+| Retrieval (RAG) | Custom BM25 keyword ranking over live room data, no vector database needed |
 | Testing | Node's built-in test runner (`node --test`), `socket.io-client` |
 
 ---
@@ -180,6 +182,22 @@ How the assistant chooses what to read:
 - **Chat**: the most recent 12 messages are always included, and older chat is searched for matches.
 - **Ranking** uses BM25 keyword search with light stemming, so it needs no downloads and works offline.
 - All content is trimmed to a 14,000-character budget.
+
+### RAG pipeline
+
+The assistant is a lightweight **Retrieval-Augmented Generation (RAG)** system. Instead of sending the whole room to the model, it retrieves only the relevant pieces first, so answers stay grounded in what is really in the room.
+
+| RAG step | In CodeMate |
+|---|---|
+| Data source | The room's live code, last run output and chat history |
+| Chunking | Chat is grouped into small message chunks, code into overlapping 30-line pieces (`retriever.js`) |
+| Retrieval | BM25 keyword ranking with light stemming and stop-word removal (`rank()`) |
+| Context selection | The best chunks are picked within a fixed character budget (`selectSources()` in `assistant.js`) |
+| Augmentation | Chosen chunks are added to the prompt as labelled `<source id="S1">` blocks (`prompt.js`) |
+| Generation | Gemini answers using only that context and cites sources like (S2) |
+| Citations | The UI shows "Based on: S1 code, S2 last run" under each answer |
+
+Why BM25 instead of embeddings: room data is small, changes constantly and is full of exact terms (function names, error messages), which keyword search handles well. It also needs no vector database, no extra API calls and no downloads, so it works offline and costs nothing. Because `rank(chunks, query)` is a single function, it can be replaced with embedding-based search later without touching the rest of the code.
 
 ---
 
@@ -529,6 +547,7 @@ The suite uses Node's built-in test runner and covers every module:
 ## Future Improvements
 
 - Standard input support for code execution.
+- Semantic retrieval for the assistant using embeddings (for example Gemini embeddings) alongside or instead of BM25.
 - Persistent storage (a database behind `RoomStore`) and room history.
 - User accounts and private or password-protected rooms.
 - More whiteboard tools: text, eraser, shapes, image export.
