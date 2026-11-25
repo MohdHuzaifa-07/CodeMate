@@ -2,6 +2,9 @@
 
 **Draw, code and chat together in real time.**
 
+**Live demo:** https://codemate-8q3l.onrender.com
+(The first load can take up to a minute.)
+
 CodeMate is a real-time collaboration workspace. People join a room with a 6-character code and work together on a shared whiteboard, a shared code editor with live cursors, one-click code execution, a room chat, and a private AI assistant, built with retrieval-augmented generation (RAG), that understands the room's code, chat and last run.
 
 ---
@@ -54,7 +57,8 @@ CodeMate is a real-time collaboration workspace. People join a room with a 6-cha
 
 ### Code execution
 - Run the room's code with one click. Everyone in the room sees who ran it and the output.
-- The server always runs its own copy of the code, never text sent by the browser.
+- Programs that read input (`scanf`, `input()`, `cin`) work: type the values, one per line, in the **Input for your program** box before clicking Run.
+- The server always runs its own copy of the code. The only thing taken from the browser is the optional program input.
 - One run at a time per room, plus per-room and daily limits.
 - Powered by the JDoodle Compiler API. The keys stay on the server.
 
@@ -148,10 +152,10 @@ sequenceDiagram
     participant U as User
     participant S as Server
     participant J as JDoodle
-    U->>S: code:run
-    S->>S: Checks: in room, code not empty, no run in progress, rate limit
+    U->>S: code:run { stdin }
+    S->>S: Checks: in room, code not empty, input under 2,000 characters, no run in progress, rate limit
     S-->>Room: code:run-started { id, by, language }
-    S->>J: POST /v1/execute (server's own copy of the code)
+    S->>J: POST /v1/execute (server's own copy of the code + optional stdin)
     J-->>S: output, cpuTime, memory
     S-->>Room: code:run-result { output, error, cpuTime, ... }
     S->>S: Save as the room's "last run"
@@ -463,7 +467,7 @@ Socket acknowledgements follow one standard shape:
 | `code:update` | both | Binary Yjs update. |
 | `code:awareness` | both | Cursor and selection info. |
 | `code:language` | both | Change the shared language. |
-| `code:run` | client → server | Run the room's code. |
+| `code:run` | client → server | Run the room's code. Optional `{ stdin }` carries the program input. |
 | `code:run-started` / `code:run-result` | server → room | Run progress and output. |
 
 ### Assistant
@@ -486,7 +490,7 @@ All limits live in `backend/src/config.js`.
 | Chat | 1,000 characters per message, 5 messages per 3 seconds per user, 200 messages kept per room |
 | Whiteboard | 3,000 elements per room, 3,000 points per stroke, 150 events per second per user, board size 1600 × 900 |
 | Code editor | 100,000 characters, 64 KB per update, 2 MB document cap |
-| Code runs | 15-second timeout, 5 runs per room per minute, one at a time per room, daily cap (`maxRunsPerDay`) |
+| Code runs | 15-second timeout, program input up to 2,000 characters, 5 runs per room per minute, one at a time per room, daily cap (`maxRunsPerDay`) |
 | Assistant | 500-character questions, 4 asks per room per minute, one at a time per person, daily cap (`maxAsksPerDay`), 30-second timeout |
 
 Safety measures:
@@ -521,7 +525,7 @@ The suite uses Node's built-in test runner and covers every module:
 | Problem | Cause and fix |
 |---|---|
 | **"Code execution is not set up on this server"** | JDoodle keys are missing. Add `JDOODLE_CLIENT_ID` and `JDOODLE_CLIENT_SECRET` to `backend/.env` and restart the backend. |
-| **"The code took too long to run"** but credits are used | The program is waiting for keyboard input (for example `scanf` or `input()`). Execution has no keyboard, so it waits until the 15-second timeout. Hardcode your test values instead. |
+| **"The code took too long to run"** but credits are used | The program is waiting for input that was not provided. Type the values it reads (one per line) in the **Input for your program** box before clicking Run. A program that reads more values than you typed also waits until the timeout. |
 | **"Daily run limit reached"** | JDoodle's free plan allows about 20 runs per day. Set `maxRunsPerDay` in `config.js` below your allowance. |
 | **"The assistant is not set up on this server"** | `GEMINI_API_KEY` is missing in `backend/.env`. Restart after adding it. |
 | **Assistant says the key was rejected** | Check the key in Google AI Studio and that it was pasted without spaces. |
@@ -536,7 +540,7 @@ The suite uses Node's built-in test runner and covers every module:
 ## Known Limitations
 
 - **In-memory storage.** Restarting the backend wipes all rooms and resets the daily counters.
-- **No stdin for code runs.** Programs that read input will time out. Supporting it needs an input box on the frontend and passing `stdin` to JDoodle.
+- **Program input is per person.** The Input box belongs to whoever clicks Run. It is not shared with the rest of the room.
 - **Assistant cannot see the whiteboard drawing**, only code, the last run and chat.
 - **No per-IP limit on room creation.** Add one before exposing the server publicly.
 - **Free-tier privacy.** Question text and room content sent to Gemini on the free tier may be used by Google. Tell users not to share private information in the room.
@@ -546,7 +550,7 @@ The suite uses Node's built-in test runner and covers every module:
 
 ## Future Improvements
 
-- Standard input support for code execution.
+- Share the program input box with the whole room.
 - Semantic retrieval for the assistant using embeddings (for example Gemini embeddings) alongside or instead of BM25.
 - Persistent storage (a database behind `RoomStore`) and room history.
 - User accounts and private or password-protected rooms.
