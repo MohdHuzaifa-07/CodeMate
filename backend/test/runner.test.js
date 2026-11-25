@@ -30,6 +30,23 @@ test('sends the mapped language and returns the output', async () => {
   });
 });
 
+test('program input is sent as stdin, and left out when there is none', async () => {
+  const bodies = [];
+  const run = createJdoodleRunner({
+    ...creds,
+    fetchImpl: async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return reply(200, { output: 'ok' });
+    },
+  });
+  await run('c', 'int main(){}', '10\n5\n+\n');
+  await run('c', 'int main(){}', '');
+  await run('c', 'int main(){}');
+  assert.equal(bodies[0].stdin, '10\n5\n+\n');
+  assert.ok(!('stdin' in bodies[1]), 'empty input is not sent');
+  assert.ok(!('stdin' in bodies[2]), 'no input is not sent');
+});
+
 test('long output is cut', async () => {
   const run = createJdoodleRunner({ ...creds, fetchImpl: async () => reply(200, { output: 'x'.repeat(50_000) }) });
   assert.equal((await run('c', 'int main(){}')).output.length, 20_000);

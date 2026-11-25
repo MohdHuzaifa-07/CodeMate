@@ -10,6 +10,7 @@ const MonacoEditor = lazy(() => import('./MonacoEditor.jsx'));
 const formatTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const MIN_OUTPUT_HEIGHT = 80;
+const STDIN_MAX = 2000; // same limit as the server
 
 export default function CodeEditorPanel({ visible }) {
   const { initial, myId, users } = useRoom();
@@ -20,6 +21,7 @@ export default function CodeEditorPanel({ visible }) {
   const [lastRun, setLastRun] = useState(initial?.code?.lastRun ?? null);
   const [runError, setRunError] = useState('');
   const [outputHeight, setOutputHeight] = useState(200);
+  const [stdin, setStdin] = useState(''); // input for the program, only used by the person who runs it
 
   useEffect(() => {
     if (visible) setEverShown(true);
@@ -85,7 +87,8 @@ export default function CodeEditorPanel({ visible }) {
 
   const run = () => {
     setRunError('');
-    socket.timeout(5000).emit('code:run', {}, (err, res) => {
+    // The server runs its own copy of the code; only the program input comes from here
+    socket.timeout(5000).emit('code:run', { stdin }, (err, res) => {
       if (err) return setRunError('The server did not answer. Try again.');
       if (!res.ok) setRunError(res.error.message);
     });
@@ -140,6 +143,23 @@ export default function CodeEditorPanel({ visible }) {
             <MonacoEditor key={sync.doc.guid} sync={sync} language={language} />
           </Suspense>
         )}
+      </div>
+
+      <div className="mt-2">
+        <label htmlFor="program-input" className="form-label small mb-1">
+          Input for your program <span className="text-body-secondary">(optional, one value per line)</span>
+        </label>
+        <textarea
+          id="program-input"
+          className="form-control form-control-sm font-monospace"
+          style={{ resize: 'vertical', minHeight: 38, maxHeight: 160 }}
+          rows={2}
+          maxLength={STDIN_MAX}
+          value={stdin}
+          placeholder="Values read by scanf, input() or cin go here, one per line"
+          spellCheck={false}
+          onChange={(e) => setStdin(e.target.value)}
+        />
       </div>
 
       <div

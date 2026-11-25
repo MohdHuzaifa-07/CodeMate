@@ -6,6 +6,7 @@ import { RunnerError } from './runner.js';
 
 const EVENTS_PER_SECOND = 300; // typing + cursor updates, per user
 const AWARENESS_MAX_BYTES = 4096;
+const STDIN_MAX = 2000; // characters of program input accepted per run
 
 export function registerCodeHandlers(io, store, { runner, runsPerRoomPerMinute = 5 }) {
   io.on('connection', (socket) => {
@@ -58,7 +59,8 @@ export function registerCodeHandlers(io, store, { runner, runsPerRoomPerMinute =
     });
 
     // Run the room's code. The server uses its own copy of the text, never what the client sends.
-    socket.on('code:run', (_payload, ack) => {
+    // The only thing taken from the client is the optional program input (stdin).
+    socket.on('code:run', (payload, ack) => {
       const reply = replyFn(ack);
       const member = store.memberOf(socket.id);
       if (!member) return fail(reply, 'NOT_IN_ROOM', 'Join a room first');
@@ -67,6 +69,12 @@ export function registerCodeHandlers(io, store, { runner, runsPerRoomPerMinute =
 
       const source = session.text;
       if (!source.trim()) return fail(reply, 'EMPTY_CODE', 'Write some code first');
+
+      const stdin = typeof payload?.stdin === 'string' ? payload.stdin : '';
+      if (stdin.length > STDIN_MAX) {
+        return fail(reply, 'STDIN_TOO_LONG', `Keep the input under ${STDIN_MAX} characters`);
+      }
+
       const allowed = session.checkRunAllowed({ perMinute: runsPerRoomPerMinute });
       if (!allowed.ok) return fail(reply, allowed.code, allowed.message);
 
@@ -77,7 +85,7 @@ export function registerCodeHandlers(io, store, { runner, runsPerRoomPerMinute =
       io.to(room.id).emit('code:run-started', { id, by, language });
       reply({ ok: true, id });
 
-      runner(language, source)
+      runner(language, source, stdin)
         .then((out) => ({ output: out.output, error: null, cpuTime: out.cpuTime, memory: out.memory }))
         .catch((err) => {
           if (!(err instanceof RunnerError)) console.error('Unexpected run error:', err);

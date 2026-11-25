@@ -12,7 +12,8 @@ const JDOODLE_URL = 'https://api.jdoodle.com/v1/execute';
 const MAX_OUTPUT_CHARS = 20_000;
 
 /**
- * Returns run(language, source) -> { output, cpuTime, memory }.
+ * Returns run(language, source, stdin) -> { output, cpuTime, memory }.
+ * `stdin` is optional text the program can read (scanf, input(), cin...).
  * It throws RunnerError for anything that goes wrong.
  * The rest of the app only knows this one function, so switching provider
  * (Judge0, Piston...) means writing another function like this one.
@@ -28,7 +29,7 @@ export function createJdoodleRunner({
   let day = '';
   let used = 0;
 
-  return async function run(language, source) {
+  return async function run(language, source, stdin = '') {
     const lang = LANGUAGES[language];
     if (!lang) throw new RunnerError('BAD_LANGUAGE', 'Unsupported language');
     if (!clientId || !clientSecret) {
@@ -44,6 +45,16 @@ export function createJdoodleRunner({
     if (used >= maxRunsPerDay) throw new RunnerError('DAILY_LIMIT', 'Daily run limit reached, try again tomorrow');
     used += 1;
 
+    const request = {
+      clientId,
+      clientSecret,
+      script: source,
+      language: lang.jdoodle.language,
+      versionIndex: lang.jdoodle.versionIndex,
+    };
+    // Only send input when there is some, so runs without input look exactly as before
+    if (typeof stdin === 'string' && stdin !== '') request.stdin = stdin;
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res;
@@ -52,13 +63,7 @@ export function createJdoodleRunner({
       res = await fetchImpl(JDOODLE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId,
-          clientSecret,
-          script: source,
-          language: lang.jdoodle.language,
-          versionIndex: lang.jdoodle.versionIndex,
-        }),
+        body: JSON.stringify(request),
         signal: controller.signal,
       });
       body = await res.json().catch(() => null);
